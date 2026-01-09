@@ -281,5 +281,7 @@ class ScotlandYardGUI:
             pygame.display.flip(); self.clock.tick(FPS)
 
 if __name__ == "__main__":
+    print("git rev control test.")
     game = ScotlandYardGUI("stations2.csv", "edges2.csv")
+
     game.run()

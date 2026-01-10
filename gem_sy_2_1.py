@@ -45,7 +45,6 @@ class Player:
         self.color = color
         self.tickets = tickets
         self.avatar = self._load_avatar(avatar_path, color)
-        # Small avatar for the move log
         self.mini_avatar = pygame.transform.scale(self.avatar, (25, 25))
 
     def _load_avatar(self, path: str, color: Tuple[int, int, int]):
@@ -78,7 +77,7 @@ class ScotlandYardGUI:
     def __init__(self, stations_csv: str, edges_csv: str):
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("Scotland Yard - Move Log Avatars")
+        pygame.display.set_caption("Scotland Yard - Reveal and Hide Logic")
         self.clock = pygame.time.Clock()
         self.font_small = pygame.font.SysFont("Verdana", 12, bold=True)
         self.font_main = pygame.font.SysFont("Verdana", 18, bold=True)
@@ -122,7 +121,7 @@ class ScotlandYardGUI:
             Player("Sherlock", PlayerType.DETECTIVE, starts[1], (40, 80, 200), {Ticket.TAXI:10, Ticket.BUS:8, Ticket.UNDERGROUND:4}, "detective_a.png"),
             Player("Katrina", PlayerType.DETECTIVE, starts[2], (200, 40, 200), {Ticket.TAXI:10, Ticket.BUS:8, Ticket.UNDERGROUND:4}, "detective_b.png"),
         ]
-        self.player_map = {p.name: p for p in self.players} # Helper for move log avatars
+        self.player_map = {p.name: p for p in self.players} 
         self.current_idx = 0
         self.turn_count = 1
         self.game_over = False
@@ -193,7 +192,7 @@ class ScotlandYardGUI:
         if p.type == PlayerType.MRX:
             valid_moves = []
             for d, modes in self.board.edges[p.node]:
-                if d not in det_positions: # COLLISION CHECK
+                if d not in det_positions: 
                     for m in modes:
                         if p.tickets[m] > 0:
                             valid_moves.append((d, m))
@@ -221,13 +220,26 @@ class ScotlandYardGUI:
 
     def next_turn(self):
         mrx = self.players[0]
-        if any(d.node == mrx.node for d in self.players if d.type == PlayerType.DETECTIVE):
+        detectives = [p for p in self.players if p.type == PlayerType.DETECTIVE]
+
+        if any(d.node == mrx.node for d in detectives):
             self.game_over, self.game_over_msg = True, "Detectives Win! Mr. X Caught."
             return
+
+        # Win Condition: Immobilized Detective
+        for d in detectives:
+            station_modes = set()
+            for _, modes in self.board.edges[d.node]:
+                station_modes.update(modes)
+            if not any(d.tickets[m] > 0 for m in station_modes):
+                self.game_over, self.game_over_msg = True, f"Mr. X Wins! {d.name} is stranded."
+                return
+
         self.current_idx = (self.current_idx + 1) % len(self.players)
         if self.current_idx == 0:
             self.turn_count += 1
-            if self.turn_count > MAX_TURNS: self.game_over, self.game_over_msg = True, "Mr. X Escaped!"
+            if self.turn_count > MAX_TURNS: 
+                self.game_over, self.game_over_msg = True, "Mr. X Escaped!"
 
     def draw_history_screen(self):
         self.screen.fill((30, 30, 35))
@@ -245,16 +257,10 @@ class ScotlandYardGUI:
             if 0 <= y_off <= view_h:
                 y = 120 + y_off
                 p_obj = self.player_map.get(m["player"])
-                
-                # Turn Number
                 self.screen.blit(self.font_small.render(str(m["turn"]), True, (200, 200, 200)), (150, y))
-                
-                # Avatar + Player Name
                 if p_obj:
                     self.screen.blit(p_obj.mini_avatar, (315, y - 5))
                 self.screen.blit(self.font_small.render(m["player"], True, (200, 200, 200)), (350, y))
-                
-                # Stations
                 self.screen.blit(self.font_small.render(str(m["from"]), True, (200, 200, 200)), (600, y))
                 self.screen.blit(self.font_small.render(str(m["to"]), True, (200, 200, 200)), (850, y))
 
@@ -273,15 +279,18 @@ class ScotlandYardGUI:
                 self.screen.fill((240, 240, 240))
                 self.draw_ui()
                 self.draw_board_elements()
-                for p in self.players:
-                    if p.type != PlayerType.MRX or self.turn_count in REVEAL_TURNS:
+                for i, p in enumerate(self.players):
+                    # REVEAL LOGIC UPDATE:
+                    # Mr. X is visible ONLY if it is a reveal turn AND it is currently HIS turn (current_idx == 0).
+                    # The moment he moves, current_idx becomes 1, and he will vanish.
+                    is_visible = p.type != PlayerType.MRX or (self.turn_count in REVEAL_TURNS and self.current_idx == 0)
+                    
+                    if is_visible:
                         pygame.draw.circle(self.screen, p.color, self.board.nodes[p.node], 16)
                         pygame.draw.circle(self.screen, (255,255,255), self.board.nodes[p.node], 16, 2)
             else: self.draw_history_screen()
             pygame.display.flip(); self.clock.tick(FPS)
 
 if __name__ == "__main__":
-    print("git rev control test.")
     game = ScotlandYardGUI("stations2.csv", "edges2.csv")
-
     game.run()

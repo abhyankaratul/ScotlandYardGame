@@ -331,12 +331,20 @@ class ScotlandYardGUI:
 
         p = self.players[self.current_idx]
         if self.pending_tickets:
+            clicked_button = False
             for ticket, rect in self.pending_tickets:
                 if rect.collidepoint(pos):
                     self.execute_move(p, self.selected_node, ticket)
-                    self.pending_tickets, self.selected_node = [], None
+                    self.pending_tickets = []
+                    clicked_button = True
                     return
-            return
+            
+            # If the user clicked anywhere ELSE while the menu was open:
+            if not clicked_button:
+                self.pending_tickets = []  # Closes the ticket selection menu
+                self.selected_node = None   # Resets the target station
+                # Optional: Play a "cancel" or "back" sound here if you have one
+                return
 
         if p.type == PlayerType.MRX:
             det_pos = [d.node for d in self.players if d.type == PlayerType.DETECTIVE]
@@ -431,6 +439,9 @@ class ScotlandYardGUI:
                     if (self.sherlock_catches_mrx_sound): self.sherlock_catches_mrx_sound.play()
                 elif (self.katrina_catches_mrx_sound):
                     self.katrina_catches_mrx_sound.play()
+        # If the capture check is succesful, do not proceed to check for stuck detective
+        if(self.game_over):
+            return
         
         # 2. Advance to next player
         self.current_idx = (self.current_idx + 1) % len(self.players)
